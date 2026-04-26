@@ -700,7 +700,13 @@ function gotoTab(t){
   if(t==='quick'){renderList();}
   if(t==='inventory')renderInv();
   if(t==='stats')renderStats();
-  if(t==='settings'){initRF();initApiKeyField();const u=getUrl();if(u)document.getElementById('sheet-url').value=u;updateConn(u);}
+  if(t==='settings'){
+    initRF();initApiKeyField();
+    const u=getUrl();
+    const si=document.getElementById('sheet-url');
+    if(si) si.value=u;
+    updateConn(u);
+  }
 }
 
 /* ── Type selector ── */
@@ -1058,8 +1064,12 @@ function exportExcel(){
 }
 
 /* ── Sheets sync ── */
-function getUrl(){try{return localStorage.getItem('toy_sheet_url')||'';}catch(e){return '';}}
-function saveUrl(){const v=document.getElementById('sheet-url').value.trim();try{localStorage.setItem('toy_sheet_url',v);}catch(e){}updateConn(v);}
+const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycbwdQTrzhq9781PjlB0FLr5CKT5bwNSYyRPGtl1412aZYfyjMmWtOeWht5DLvS07Ippd/exec';
+function getUrl(){try{return localStorage.getItem('toy_sheet_url')||DEFAULT_SHEET_URL;}catch(e){return DEFAULT_SHEET_URL;}}function saveUrl(){
+  const v=document.getElementById('sheet-url').value.trim();
+  try{localStorage.setItem('toy_sheet_url',v||DEFAULT_SHEET_URL);}catch(e){}
+  updateConn(v||DEFAULT_SHEET_URL);
+}
 function updateConn(url){
   const v=url&&url.includes('script.google.com');
   document.getElementById('conn-dot').className='dot'+(v?' on':'');
@@ -1113,7 +1123,8 @@ function showFlash(msg,type='ok'){
 }
 
 /* ── API Key ── */
-function getApiKey(){try{return localStorage.getItem('toy_apikey')||'';}catch(e){return '';}}
+const DEFAULT_GEMINI_KEY='AIzaSyCddNRsUUXeGsl_lYsFEuzoa5p5AfSrjdc';
+function getApiKey(){try{return localStorage.getItem('toy_apikey')||DEFAULT_GEMINI_KEY;}catch(e){return DEFAULT_GEMINI_KEY;}}
 function saveApiKey(){
   const v=document.getElementById('apikey-input').value.trim();
   try{localStorage.setItem('toy_apikey',v);}catch(e){}
@@ -1134,7 +1145,7 @@ function updateAiWarn(){
 function initApiKeyField(){
   const k=getApiKey();
   const inp=document.getElementById('apikey-input');
-  if(inp&&k) inp.value=k;
+  if(inp) inp.value=k;
   updateAiWarn();
 }
 
