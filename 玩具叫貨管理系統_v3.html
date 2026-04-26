@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玩具叫貨管理系統</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --pink:#e91e8c;--pink-d:#b5006e;--pink-bg:#fce4f3;
+  --navy:#1a1a2e;--navy2:#16213e;--teal:#00bfa5;
+  --green:#1d6f42;--green-d:#155233;
+  --text:#1a1a2e;--muted:#6b7280;--border:#e5e7eb;--bg:#f9fafb;--surface:#fff;
+  --r:10px;--rl:14px;
+}
+body{font-family:'Noto Sans TC',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* ── Header ── */
+.header{background:var(--navy);padding:14px 20px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50;}
+.hicon{width:38px;height:38px;background:var(--pink);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ht{color:#fff;font-size:17px;font-weight:700;}.hs{color:#9ca3af;font-size:12px;}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.dot{width:9px;height:9px;border-radius:50%;background:#4b5563;flex-shrink:0;}.dot.on{background:#059669;}
+
+/* ── Tabs ── */
+.tabs{background:var(--navy2);display:flex;padding:0 20px;overflow-x:auto;}
+.tab{padding:11px 18px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:none;color:#9ca3af;border-bottom:2px solid transparent;white-space:nowrap;font-family:inherit;}
+.tab.active{color:#ffd600;border-bottom-color:#ffd600;}.tab:hover:not(.active){color:#e5e7eb;}
+
+/* ── Pages ── */
+.page{display:none;padding:20px;max-width:1100px;margin:0 auto;}.page.active{display:block;}
+
+/* ── Stat cards ── */
+.srow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+@media(max-width:600px){.srow{grid-template-columns:repeat(2,1fr);}}
+.sc{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px;border-left:3px solid var(--pink);}
+.sc.y{border-left-color:#f59e0b;}.sc.t{border-left-color:var(--teal);}.sc.n{border-left-color:#6366f1;}
+.slbl{font-size:11px;color:var(--muted);margin-bottom:6px;}.sv{font-size:22px;font-weight:700;}
+.sv.pk{color:var(--pink);}.sv.y{color:#b45309;}.sv.t{color:var(--teal);}
+
+/* ── Form fields ── */
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:0.4px;}
+.field input,.field select,.field textarea{padding:10px 12px;font-size:14px;border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text);width:100%;font-family:inherit;transition:border-color 0.12s;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 3px #fce4f380;}
+.field textarea{height:56px;resize:vertical;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.r3{display:grid;grid-template-columns:2fr 1fr 1.4fr;gap:10px;margin-bottom:14px;}
+@media(max-width:520px){.r2,.r3{display:flex;flex-direction:column;}}
+
+/* ── Quick form specific ── */
+.section-lbl{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:0.5px;margin-bottom:8px;margin-top:18px;display:flex;align-items:center;gap:6px;}
+.section-lbl:first-child{margin-top:0;}
+.section-lbl::before{content:'';width:3px;height:12px;background:var(--pink);border-radius:2px;}
+
+/* Type grid */
+.tgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:16px;}
+.tbtn{padding:12px 4px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;text-align:center;transition:all 0.12s;font-family:inherit;}
+.tbtn .ico{font-size:22px;display:block;margin-bottom:4px;}.tbtn .lbl{font-size:11px;color:var(--muted);font-weight:600;}
+.tbtn.sel{border-color:var(--pink);background:var(--pink-bg);}.tbtn.sel .lbl{color:var(--pink-d);}
+.tbtn:hover:not(.sel){background:var(--bg);}
+
+/* Status grid — big tap targets */
+.sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;}
+.sbtn{
+  padding:14px 4px;border:2px solid #e5e7eb;border-radius:var(--r);
+  background:#f9fafb;cursor:pointer;text-align:center;
+  transition:all 0.15s;font-family:inherit;opacity:0.5;
+  transform:scale(0.96);
+}
+.sbtn .sico{font-size:20px;display:block;margin-bottom:4px;filter:grayscale(60%);}
+.sbtn .slb{font-size:11px;color:#9ca3af;font-weight:600;}
+/* selected state — much more obvious */
+.sbtn.sel-s{opacity:1;transform:scale(1);box-shadow:0 2px 10px rgba(0,0,0,0.12);}
+.sbtn.sel-s .sico{filter:none;}
+.sbtn.sel-s .slb{font-weight:800;}
+/* per-status colours (applied to ALL, dim when unselected) */
+.sbtn.s-notship{border-color:#d1d5db;}
+.sbtn.s-notship.sel-s{border-color:#374151;background:#f3f4f6;border-width:3px;}
+.sbtn.s-notship.sel-s .slb{color:#111827;}
+.sbtn.s-shipped{border-color:#c4b5fd;}
+.sbtn.s-shipped.sel-s{border-color:#7c3aed;background:#ede9fe;border-width:3px;}
+.sbtn.s-shipped.sel-s .slb{color:#4c1d95;}
+.sbtn.s-logistics{border-color:#7dd3fc;}
+.sbtn.s-logistics.sel-s{border-color:#0891b2;background:#e0f2fe;border-width:3px;}
+.sbtn.s-logistics.sel-s .slb{color:#0e4f6b;}
+.sbtn.s-arrived{border-color:#6ee7b7;}
+.sbtn.s-arrived.sel-s{border-color:#059669;background:#d1fae5;border-width:3px;}
+.sbtn.s-arrived.sel-s .slb{color:#065f46;}
+
+/* Otype toggle */
+.otype-row{display:flex;gap:8px;margin-bottom:14px;}
+.otype-btn{flex:1;padding:11px;border:1.5px solid var(--border);border-radius:var(--r);background:var(--surface);cursor:pointer;text-align:center;font-size:13px;font-weight:700;font-family:inherit;transition:all 0.12s;color:var(--muted);}
+.otype-btn.sel-stock{border-color:#059669;background:#f0fdf4;color:#065f46;}
+.otype-btn.sel-custom{border-color:#7c3aed;background:#ede9fe;color:#4c1d95;}
+
+/* Customer box */
+.custbox{background:#ede9fe;border:0.5px solid #c4b5fd;border-radius:var(--r);padding:12px 14px;margin-bottom:14px;display:none;}
+.custbox.open{display:block;}
+
+/* FX box */
+.fxbox{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px;}
+.fxrow{display:grid;grid-template-columns:1fr 90px 20px 1fr;gap:10px;align-items:flex-end;}
+.fxarrow{font-size:18px;color:var(--muted);padding-bottom:9px;text-align:center;}
+.fxres{font-size:15px;font-weight:700;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--pink);min-height:40px;}
+
+/* Deposit box */
+.depbox{background:#f0fdf4;border:0.5px solid #86efac;border-radius:var(--r);padding:14px;margin-bottom:14px;}
+
+/* Presale box */
+.psbox{background:#fffbeb;border:0.5px solid #fcd34d;border-radius:var(--r);padding:14px;margin-bottom:14px;}
+.pstoggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:700;}
+.pstoggle input[type=checkbox]{width:18px;height:18px;accent-color:var(--pink);cursor:pointer;}
+.psdetail{margin-top:12px;display:none;}.psdetail.open{display:block;}
+
+/* Preview bar */
+.prev{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.pitem .plbl{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.pval{font-size:16px;font-weight:700;}.pval.pk{color:var(--pink);}.pval.gn{color:#059669;}.pval.am{color:#d97706;}
+
+/* Buttons */
+.btn{padding:9px 18px;font-size:13px;font-weight:700;border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text);cursor:pointer;transition:all 0.12s;font-family:inherit;}
+.btn:hover{background:var(--bg);}.btn:active{transform:scale(0.98);}
+.btn.primary{background:var(--pink);color:#fff;border-color:var(--pink);font-size:15px;padding:12px 24px;}
+.btn.primary:hover{background:var(--pink-d);}
+.btn.sheets{background:var(--green);color:#fff;border-color:var(--green);}.btn.sheets:hover{background:var(--green-d);}
+.btn.sheets:disabled{background:#9ca3af;border-color:#9ca3af;cursor:not-allowed;}
+.btn.excel{background:#1d6f42;color:#fff;border-color:#1d6f42;font-size:12px;}.btn.excel:hover{background:#155233;}
+.btn.sm{padding:5px 10px;font-size:12px;}.btn.danger{color:#dc2626;border-color:#fca5a5;}.btn.danger:hover{background:#fef2f2;}
+.actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:4px;}
+.add-btn-wrap{margin-top:4px;margin-bottom:6px;}
+.add-btn-wrap .btn.primary{width:100%;border-radius:12px;}
+
+/* Toolbar */
+.toolbar{display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+.toolbar input,.toolbar select{padding:8px 10px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface);color:var(--text);font-family:inherit;}
+.toolbar input{min-width:150px;}.spacer{flex:1;}
+
+/* Table */
+.tblwrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:9px 11px;font-size:11px;font-weight:700;color:var(--muted);border-bottom:1.5px solid var(--border);background:var(--bg);white-space:nowrap;letter-spacing:0.4px;}
+td{padding:10px 11px;border-bottom:0.5px solid var(--border);vertical-align:middle;}
+tr:hover td{background:#fdf4fa;}.empty{text-align:center;padding:3rem;color:var(--muted);font-size:13px;}
+
+/* Badges */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;}
+.badge.ichiban{background:var(--pink-bg);color:var(--pink-d);}
+.badge.blind{background:#ede9fe;color:#4c1d95;}
+.badge.figure{background:#dbeafe;color:#1e40af;}
+.badge.card{background:#d1fae5;color:#065f46;}
+.badge.other2{background:#f3f4f6;color:#374151;}
+/* status badges */
+.st-notship  {background:#f3f4f6;color:#374151;}
+.st-shipped  {background:#ede9fe;color:#4c1d95;}
+.st-logistics{background:#e0f2fe;color:#0e4f6b;}
+.st-arrived  {background:#d1fae5;color:#065f46;}
+.st-presale  {background:#fef3c7;color:#92400e;}
+/* inline tags */
+.ctag{font-size:11px;background:#ede9fe;color:#4c1d95;border:0.5px solid #c4b5fd;border-radius:4px;padding:1px 6px;display:inline-block;}
+.stktag{font-size:11px;background:#f0fdf4;color:#065f46;border:0.5px solid #86efac;border-radius:4px;padding:1px 6px;display:inline-block;}
+.dtag{font-size:11px;background:#f0fdf4;color:#065f46;border:0.5px solid #86efac;border-radius:4px;padding:1px 6px;display:inline-block;}
+.pstag{font-size:11px;background:#fffbeb;color:#92400e;border:0.5px solid #fcd34d;border-radius:4px;padding:1px 6px;display:inline-block;}
+.uatag{font-size:11px;background:#fee2e2;color:#991b1b;border:0.5px solid #fca5a5;border-radius:4px;padding:1px 6px;display:inline-block;}
+
+/* Order cards */
+.ocard{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:8px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;}
+.ocard:hover{border-color:#e91e8c44;}
+.oname{font-size:14px;font-weight:700;}.ometa{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.8;}
+
+/* Alert */
+.alert{border-radius:var(--r);padding:11px 14px;margin-bottom:12px;font-size:13px;font-weight:600;display:none;align-items:center;gap:8px;}
+.alert.show{display:flex;}.alert.ok{background:#d1fae5;color:#065f46;}.alert.err{background:#fee2e2;color:#991b1b;}.alert.warn{background:#fef3c7;color:#92400e;}
+
+/* Charts */
+.cwrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:16px;margin-bottom:16px;}
+.ctitle{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.ctitle::before{content:'';width:3px;height:14px;background:var(--pink);border-radius:2px;display:inline-block;}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:600px){.cgrid{grid-template-columns:1fr;}}
+.brow{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.blbl{width:100px;font-size:12px;color:var(--muted);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.btrack{flex:1;height:20px;background:var(--bg);border-radius:4px;overflow:hidden;}
+.bfill{height:100%;border-radius:4px;transition:width 0.5s;}
+.bval{font-size:12px;font-weight:700;min-width:55px;}
+
+/* Config box */
+.cfgbox{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px;}
+.cfghd{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.cfglbl{font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.cfgbody{margin-top:14px;padding-top:14px;border-top:0.5px solid var(--border);}
+
+/* Modal */
+.mwrap{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;padding:16px;}
+.mwrap.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--rl);padding:24px;width:560px;max-width:100%;max-height:90vh;overflow-y:auto;}
+.modal h3{font-size:15px;font-weight:700;margin-bottom:18px;}
+.mactions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:14px;border-top:0.5px solid var(--border);}
+.lowtag{color:#dc2626;font-weight:700;}
+
+/* Quick form divider */
+.qdivider{border:none;border-top:0.5px solid var(--border);margin:16px 0;}
+
+/* AI scan box */
+.aibox{background:linear-gradient(135deg,#fdf4ff,#fce4f3);border:1.5px solid #f0abdc;border-radius:var(--rl);padding:14px 16px;margin-bottom:0;}
+.ai-drop{border:2px dashed #e879c0;border-radius:var(--r);padding:24px 16px;text-align:center;cursor:pointer;transition:all 0.15s;background:rgba(255,255,255,0.6);}
+.ai-drop:hover,.ai-drop.drag{background:rgba(255,255,255,0.9);border-color:var(--pink);}
+.ai-spinning{display:inline-block;animation:spin 1s linear infinite;font-size:18px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ai-field-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.ai-field-lbl{font-size:12px;color:var(--muted);width:60px;flex-shrink:0;}
+.ai-field-val{font-size:13px;font-weight:700;flex:1;}
+.ai-field-edit{padding:4px 8px;font-size:13px;border:0.5px solid var(--border);border-radius:6px;flex:1;font-family:inherit;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hicon">🎁</div>
+  <div><div class="ht">玩具叫貨管理系統</div><div class="hs">一番賞・盲盒・Figure・卡牌</div></div>
+  <div class="hright"><span class="dot" id="hdr-dot"></span><span style="font-size:12px;color:#9ca3af;" id="hdr-lbl">未連接試算表</span></div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="gotoTab('quick')">⚡ 快速填單</button>
+  <button class="tab" onclick="gotoTab('orders')">📋 叫貨單</button>
+  <button class="tab" onclick="gotoTab('inventory')">📦 庫存</button>
+  <button class="tab" onclick="gotoTab('stats')">📊 統計</button>
+  <button class="tab" onclick="gotoTab('settings')">⚙️ 設定</button>
+</div>
+
+<!-- ===== 快速填單 ===== -->
+<div id="page-quick" class="page active">
+  <div id="flash" class="alert ok"></div>
+
+  <!-- AI 截圖辨識 -->
+  <div class="aibox" id="aibox">
+    <div class="section-lbl" style="margin-top:0;">📷 截圖 AI 辨識</div>
+
+    <!-- no-key warning -->
+    <div id="ai-nokey-warn" style="display:none;margin-bottom:10px;padding:10px 12px;background:#fffbeb;border:0.5px solid #fcd34d;border-radius:var(--r);font-size:12px;color:#92400e;">
+      ⚠️ 尚未設定 API Key，請先到 <strong>⚙️ 設定</strong> 頁面填入免費的 <strong>Google Gemini API Key</strong>，即可使用自動辨識功能。
+    </div>
+
+    <!-- upload zone -->
+    <div class="ai-drop" id="ai-drop" onclick="document.getElementById('ai-file').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+      <input type="file" id="ai-file" accept="image/*" style="display:none" onchange="handleFile(event)">
+      <div id="ai-drop-inner">
+        <div style="font-size:28px;margin-bottom:6px;">🖼️</div>
+        <div style="font-size:13px;font-weight:600;color:var(--muted);">點擊或拖曳訂單截圖</div>
+        <div style="font-size:11px;color:#9ca3af;margin-top:3px;">上傳後 AI 自動辨識商品資訊</div>
+      </div>
+    </div>
+
+    <div id="ai-preview-wrap" style="display:none;margin-top:10px;">
+      <img id="ai-preview-img" style="max-width:100%;max-height:200px;border-radius:8px;border:0.5px solid var(--border);display:block;">
+    </div>
+
+    <div id="ai-status" style="display:none;margin-top:10px;align-items:center;gap:8px;"></div>
+
+    <!-- result box -->
+    <div id="ai-result-box" style="display:none;margin-top:12px;background:#fff;border:2px solid var(--pink);border-radius:var(--r);padding:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--pink-d);margin-bottom:10px;">✨ AI 辨識結果 — 確認後點「套用到表單」</div>
+      <div id="ai-result-content"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn primary" style="font-size:13px;padding:9px 18px;" onclick="applyAiResult()">套用到表單</button>
+        <button class="btn" style="font-size:12px;" onclick="clearAi()">重新上傳</button>
+      </div>
+    </div>
+  </div>
+
+  <hr class="qdivider">
+
+  <!-- 商品類型 -->
+  <div class="section-lbl">商品類型</div>
+  <div class="tgrid">
+    <button class="tbtn sel" data-type="ichiban" onclick="selectType(this)"><span class="ico">🎯</span><span class="lbl">一番賞</span></button>
+    <button class="tbtn" data-type="blind"   onclick="selectType(this)"><span class="ico">📦</span><span class="lbl">盲盒</span></button>
+    <button class="tbtn" data-type="figure"  onclick="selectType(this)"><span class="ico">🗿</span><span class="lbl">Figure</span></button>
+    <button class="tbtn" data-type="card"    onclick="selectType(this)"><span class="ico">🃏</span><span class="lbl">卡牌</span></button>
+    <button class="tbtn" data-type="other2"  onclick="selectType(this)"><span class="ico">🛍</span><span class="lbl">其他</span></button>
+  </div>
+
+  <!-- 商品名稱 + 供應商 -->
+  <div class="r2">
+    <div class="field"><label>商品名稱 *</label><input type="text" id="f-name" placeholder="例：LABUBU 野獸系列" oninput="calcFx()"></div>
+    <div class="field"><label>供應商</label><input type="text" id="f-sup" placeholder="例：POP MART、創夢"></div>
+  </div>
+
+  <hr class="qdivider">
+
+  <!-- 進貨狀態 -->
+  <div class="section-lbl">進貨狀態</div>
+  <div class="sgrid">
+    <button class="sbtn s-notship sel-s" data-st="notship" onclick="selectStatus(this)">
+      <span class="sico">📋</span><span class="slb">未出貨</span>
+    </button>
+    <button class="sbtn" data-st="shipped" onclick="selectStatus(this)">
+      <span class="sico">📤</span><span class="slb">已出貨</span>
+    </button>
+    <button class="sbtn" data-st="logistics" onclick="selectStatus(this)">
+      <span class="sico">🚢</span><span class="slb">已集運</span>
+    </button>
+    <button class="sbtn" data-st="arrived" onclick="selectStatus(this)">
+      <span class="sico">✅</span><span class="slb">已到台灣</span>
+    </button>
+  </div>
+
+  <hr class="qdivider">
+
+  <!-- 現貨 / 客訂 -->
+  <div class="section-lbl">叫貨性質</div>
+  <div class="otype-row">
+    <button class="otype-btn sel-stock" id="otype-stock" onclick="setOtype('stock')">🏪 現貨</button>
+    <button class="otype-btn" id="otype-custom" onclick="setOtype('custom')">👤 客訂</button>
+  </div>
+  <div class="custbox" id="custbox">
+    <div class="r2" style="margin-bottom:0;">
+      <div class="field"><label>👤 預訂者姓名</label><input type="text" id="f-customer" placeholder="例：王小明"></div>
+      <div class="field"><label>聯絡方式</label><input type="text" id="f-contact" placeholder="例：Line ID、電話"></div>
+    </div>
+  </div>
+
+  <hr class="qdivider">
+
+  <!-- 數量 + 進價 -->
+  <div class="section-lbl">數量與進價</div>
+  <div class="fxbox">
+    <div class="fxrow">
+      <div class="field"><label>進價金額</label><input type="number" id="f-price-raw" placeholder="0" min="0" oninput="calcFx()"></div>
+      <div class="field"><label>幣別</label>
+        <select id="f-currency" onchange="calcFx()">
+          <option value="TWD">TWD 台幣</option>
+          <option value="CNY">CNY 人民幣</option>
+          <option value="JPY">JPY 日圓</option>
+          <option value="KRW">KRW 韓元</option>
+          <option value="USD">USD 美元</option>
+          <option value="HKD">HKD 港幣</option>
+        </select>
+      </div>
+      <div class="fxarrow">→</div>
+      <div class="field"><label>換算台幣（元）</label><div class="fxres" id="fx-result">—</div></div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px;" id="rate-note">固定匯率 · CNY=4.75 · JPY=0.25 · KRW=0.03 · USD=31.48 · HKD=4.03</div>
+  </div>
+
+  <div class="r2">
+    <div class="field"><label>數量</label>
+      <div style="display:flex;gap:6px;">
+        <input type="number" id="f-qty" placeholder="0" min="0" step="1" oninput="calcFx()" style="flex:1;">
+        <select id="f-unit" style="width:70px;padding:10px 6px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--r);background:var(--surface);font-family:inherit;">
+          <option>套</option><option>盒</option><option>個</option><option>箱</option><option>包</option><option>端</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>💰 訂金（留空＝全額付清）</label><input type="number" id="f-deposit" placeholder="留空＝全額" min="0" oninput="calcFx()" style="font-size:13px;padding:8px 10px;"></div>
+  </div>
+
+  <!-- 預售 -->
+  <div class="psbox">
+    <label class="pstoggle"><input type="checkbox" id="f-presale" onchange="togglePresale()">🗓 預售商品（勾選後填預計發貨月份）</label>
+    <div class="psdetail" id="presale-detail">
+      <div class="r2" style="margin-top:10px;margin-bottom:0;">
+        <div class="field"><label>預計發貨年份</label><select id="f-presale-year"></select></div>
+        <div class="field"><label>預計發貨月份</label>
+          <select id="f-presale-month">
+            <option value="1">1 月</option><option value="2">2 月</option><option value="3">3 月</option>
+            <option value="4">4 月</option><option value="5">5 月</option><option value="6">6 月</option>
+            <option value="7">7 月</option><option value="8">8 月</option><option value="9">9 月</option>
+            <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 預覽 -->
+  <div id="preview" class="prev" style="display:none;">
+    <div class="pitem"><div class="plbl">叫貨總成本</div><div class="pval pk" id="prev-total">—</div></div>
+    <div class="pitem"><div class="plbl">已付訂金</div><div class="pval gn" id="prev-dep">—</div></div>
+    <div class="pitem"><div class="plbl">尾款</div><div class="pval am" id="prev-balance">—</div></div>
+  </div>
+
+  <div class="add-btn-wrap">
+    <button class="btn primary" onclick="addOrder()">＋ 新增叫貨單</button>
+  </div>
+  <div style="text-align:right;margin-bottom:8px;"><button class="btn" style="font-size:12px;padding:6px 12px;" onclick="resetForm()">清除表單</button></div>
+
+  <hr class="qdivider">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <span style="font-size:14px;font-weight:700;">最近叫貨</span>
+    <span style="font-size:12px;color:var(--muted);" id="list-count">共 0 筆</span>
+  </div>
+  <div id="order-list"></div>
+</div>
+
+<!-- ===== 叫貨單列表 ===== -->
+<div id="page-orders" class="page">
+  <div class="srow">
+    <div class="sc">  <div class="slbl">本月叫貨單</div><div class="sv" id="s1">0</div></div>
+    <div class="sc y"><div class="slbl">未到台灣</div><div class="sv y" id="s2">0</div></div>
+    <div class="sc t"><div class="slbl">已到台灣</div><div class="sv t" id="s3">0</div></div>
+    <div class="sc n"><div class="slbl">本月金額（台幣）</div><div class="sv pk" id="s4">0</div></div>
+  </div>
+  <div class="toolbar">
+    <input type="text" id="q-order" placeholder="搜尋品名、供應商、預訂者..." oninput="renderOrders()">
+    <select id="f-type" onchange="renderOrders()">
+      <option value="">全部類型</option>
+      <option value="ichiban">一番賞</option><option value="blind">盲盒</option>
+      <option value="figure">Figure</option><option value="card">卡牌</option><option value="other2">其他</option>
+    </select>
+    <select id="f-status" onchange="renderOrders()">
+      <option value="">全部狀態</option>
+      <option value="notship">未出貨</option>
+      <option value="shipped">已出貨</option>
+      <option value="logistics">已集運</option>
+      <option value="arrived">已到台灣</option>
+      <option value="presale">預售</option>
+    </select>
+    <select id="f-otype" onchange="renderOrders()">
+      <option value="">全部性質</option>
+      <option value="stock">🏪 現貨</option>
+      <option value="custom">👤 客訂</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn excel" onclick="exportExcel()">⬇ 匯出 Excel</button>
+    <button class="btn primary" style="font-size:13px;padding:9px 18px;" onclick="openOrderModal()">＋ 新增</button>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr>
+        <th>日期</th><th>商品名稱</th><th>類型</th><th>供應商</th>
+        <th>數量</th><th>進價(台幣)</th><th>訂金</th><th>尾款</th>
+        <th>狀態</th><th>性質/預訂者</th><th>預售</th><th>操作</th>
+      </tr></thead>
+      <tbody id="order-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== 庫存 ===== -->
+<div id="page-inventory" class="page">
+  <div id="low-alert" class="alert warn">⚠️ 有商品庫存低於安全量，請留意補貨！</div>
+  <div class="toolbar">
+    <input type="text" id="q-inv" placeholder="搜尋商品..." oninput="renderInv()">
+    <select id="f-inv-type" onchange="renderInv()">
+      <option value="">全部類型</option>
+      <option value="ichiban">一番賞</option><option value="blind">盲盒</option>
+      <option value="figure">Figure</option><option value="card">卡牌</option><option value="other2">其他</option>
+    </select>
+    <select id="f-inv-stock" onchange="renderInv()">
+      <option value="">全部</option><option value="low">庫存不足</option><option value="ok">正常</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn primary" style="font-size:13px;padding:9px 18px;" onclick="openInvModal()">＋ 新增品項</button>
+  </div>
+  <div class="tblwrap">
+    <table>
+      <thead><tr><th>商品名稱</th><th>類型</th><th>庫存</th><th>單位</th><th>安全庫存</th><th>狀態</th><th>備註</th><th>操作</th></tr></thead>
+      <tbody id="inv-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== 統計 ===== -->
+<div id="page-stats" class="page">
+  <div class="srow">
+    <div class="sc">  <div class="slbl">總叫貨金額（台幣）</div><div class="sv pk" id="r1">0</div></div>
+    <div class="sc y"><div class="slbl">客訂單數</div><div class="sv y" id="r2">0</div></div>
+    <div class="sc t"><div class="slbl">熱門品項</div><div class="sv" style="font-size:13px;" id="r3">—</div></div>
+    <div class="sc n"><div class="slbl">預售待到貨</div><div class="sv" id="r4">0</div></div>
+  </div>
+  <div class="cgrid">
+    <div class="cwrap"><div class="ctitle">各類型叫貨金額</div><div id="chart-type"></div></div>
+    <div class="cwrap"><div class="ctitle">各狀態訂單數</div><div id="chart-status"></div></div>
+  </div>
+  <div class="cwrap"><div class="ctitle">供應商叫貨金額 Top 6</div><div id="chart-sup"></div></div>
+  <div class="cwrap"><div class="ctitle">熱銷商品叫貨次數 Top 8</div><div id="chart-items"></div></div>
+</div>
+
+<!-- ===== 設定 ===== -->
+<div id="page-settings" class="page">
+  <div class="cfgbox">
+    <div class="cfghd" onclick="toggleCfg('apikey')">
+      <div class="cfglbl"><span id="apikey-dot">🤖</span> Claude API Key（截圖 AI 辨識）</div>
+      <span style="font-size:12px;color:var(--muted);" id="cfg-apikey-t">▼ 展開</span>
+    </div>
+    <div id="cfg-apikey" style="display:none;" class="cfgbody">
+      <div class="field">
+        <label>Google Gemini API Key（免費）</label>
+        <div style="display:flex;gap:8px;">
+          <input type="password" id="apikey-input" placeholder="AIzaSy..." oninput="saveApiKey()" style="flex:1;font-family:monospace;">
+          <button class="btn sm" onclick="toggleApiKeyVis()" id="apikey-eye">👁</button>
+        </div>
+      </div>
+      <div style="margin-top:10px;padding:10px 12px;background:#e0f2fe;border:0.5px solid #7dd3fc;border-radius:var(--r);">
+        <div style="font-size:12px;font-weight:700;color:#0e4f6b;margin-bottom:6px;">🎉 完全免費！每天 1,500 次</div>
+        <div style="font-size:11px;color:#0e4f6b;line-height:1.8;">
+          1. 前往 <a href="https://aistudio.google.com/apikey" target="_blank" style="color:var(--pink);font-weight:700;">aistudio.google.com/apikey</a><br>
+          2. 登入 Google 帳號 → 點「Create API Key」<br>
+          3. 複製 Key（格式：AIzaSy...）貼到上方<br>
+          4. 回快速填單上傳截圖即可自動辨識 ✅
+        </div>
+      </div>
+      <div style="margin-top:8px;padding:8px 12px;background:#fdf4ff;border:0.5px solid #e879f9;border-radius:var(--r);font-size:11px;color:#6b21a8;">
+        🔒 Key 只存在你的瀏覽器，不會傳送到任何伺服器
+      </div>
+      <div style="margin-top:8px;font-size:12px;" id="apikey-status"></div>
+    </div>
+  </div>
+  <div class="cfgbox">
+    <div class="cfghd" onclick="toggleCfg('sheets')">
+      <div class="cfglbl"><span class="dot" id="conn-dot"></span>Google 試算表同步</div>
+      <span style="font-size:12px;color:var(--muted);" id="cfg-sheets-t">▼ 展開</span>
+    </div>
+    <div id="cfg-sheets" style="display:none;" class="cfgbody">
+      <div class="field"><label>Apps Script Web App URL</label><input type="text" id="sheet-url" placeholder="https://script.google.com/macros/s/xxxxx/exec" oninput="saveUrl()"></div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">
+        <span style="font-size:12px;color:var(--muted);" id="sync-status">尚未設定</span>
+        <div style="flex:1;"></div>
+        <button class="btn sheets" id="sync-btn" onclick="syncSheets()" disabled>同步至試算表</button>
+      </div>
+    </div>
+  </div>
+  <div class="cfgbox">
+    <div class="cfghd" onclick="toggleCfg('rates')">
+      <div class="cfglbl">💱 匯率設定</div>
+      <span style="font-size:12px;color:var(--muted);" id="cfg-rates-t">▼ 展開</span>
+    </div>
+    <div id="cfg-rates" style="display:none;" class="cfgbody">
+      <div class="r2">
+        <div class="field"><label>CNY 人民幣 → 台幣</label><input type="number" id="r-cny" step="0.01" oninput="saveRates()"></div>
+        <div class="field"><label>JPY 日圓 → 台幣</label><input type="number" id="r-jpy" step="0.001" oninput="saveRates()"></div>
+      </div>
+      <div class="r2">
+        <div class="field"><label>KRW 韓元 → 台幣</label><input type="number" id="r-krw" step="0.001" oninput="saveRates()"></div>
+        <div class="field"><label>USD 美元 → 台幣</label><input type="number" id="r-usd" step="0.01" oninput="saveRates()"></div>
+      </div>
+      <div class="r2">
+        <div class="field"><label>HKD 港幣 → 台幣</label><input type="number" id="r-hkd" step="0.01" oninput="saveRates()"></div>
+        <div class="field"></div>
+      </div>
+    </div>
+  </div>
+  <div class="cfgbox">
+    <div style="font-size:13px;font-weight:700;margin-bottom:12px;">資料管理</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn excel" onclick="exportExcel()">⬇ 匯出 Excel</button>
+      <button class="btn danger" onclick="clearData()">清除所有資料</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: 叫貨單 -->
+<div class="mwrap" id="modal-order">
+<div class="modal">
+  <h3 id="modal-ttl">新增叫貨單</h3>
+  <div class="r2">
+    <div class="field"><label>日期</label><input type="date" id="mo-date"></div>
+    <div class="field"><label>商品類型</label>
+      <select id="mo-type">
+        <option value="ichiban">一番賞</option><option value="blind">盲盒</option>
+        <option value="figure">Figure</option><option value="card">卡牌</option><option value="other2">其他</option>
+      </select>
+    </div>
+  </div>
+  <div class="r2">
+    <div class="field" style="margin-bottom:0;"><label>商品名稱 *</label><input type="text" id="mo-name"></div>
+    <div class="field" style="margin-bottom:0;"><label>供應商</label><input type="text" id="mo-sup"></div>
+  </div>
+  <div style="margin-bottom:14px;"></div>
+  <div class="r3">
+    <div class="field"><label>進價金額</label><input type="number" id="mo-price-raw" oninput="modalCalc()"></div>
+    <div class="field"><label>幣別</label>
+      <select id="mo-cur" onchange="modalCalc()">
+        <option value="TWD">TWD</option><option value="CNY">CNY</option>
+        <option value="JPY">JPY</option><option value="KRW">KRW</option>
+        <option value="USD">USD</option><option value="HKD">HKD</option>
+      </select>
+    </div>
+    <div class="field"><label>換算台幣</label><div class="fxres" id="mo-fx" style="font-size:13px;">—</div></div>
+  </div>
+  <div class="r3">
+    <div class="field"><label>數量</label><input type="number" id="mo-qty" oninput="modalCalc()"></div>
+    <div class="field"><label>單位</label>
+      <select id="mo-unit"><option>套</option><option>盒</option><option>個</option><option>箱</option><option>包</option><option>端</option></select>
+    </div>
+    <div class="field"><label>訂金（留空＝全額）</label><input type="number" id="mo-deposit" placeholder="留空代表已付全額" oninput="modalCalc()"></div>
+  </div>
+  <div class="r2">
+    <div class="field"><label>狀態</label>
+      <select id="mo-status">
+        <option value="notship">未出貨</option><option value="shipped">已出貨</option>
+        <option value="logistics">已集運</option><option value="arrived">已到台灣</option>
+        <option value="presale">預售</option>
+      </select>
+    </div>
+    <div class="field"><label>叫貨性質</label>
+      <select id="mo-otype" onchange="toggleMOcust()">
+        <option value="stock">🏪 現貨</option><option value="custom">👤 客訂</option>
+      </select>
+    </div>
+  </div>
+  <div class="custbox" id="mo-custbox">
+    <div class="r2" style="margin-bottom:0;">
+      <div class="field"><label>預訂者姓名</label><input type="text" id="mo-customer" placeholder="例：王小明"></div>
+      <div class="field"><label>聯絡方式</label><input type="text" id="mo-contact" placeholder="例：Line、電話"></div>
+    </div>
+  </div>
+  <div class="psbox" style="margin-bottom:12px;">
+    <label class="pstoggle"><input type="checkbox" id="mo-presale" onchange="toggleModalPresale()">🗓 預售商品</label>
+    <div class="psdetail" id="mo-presale-detail">
+      <div class="r2" style="margin-top:10px;margin-bottom:0;">
+        <div class="field"><label>預計發貨年份</label><select id="mo-presale-year"></select></div>
+        <div class="field"><label>預計發貨月份</label>
+          <select id="mo-presale-month">
+            <option value="1">1 月</option><option value="2">2 月</option><option value="3">3 月</option>
+            <option value="4">4 月</option><option value="5">5 月</option><option value="6">6 月</option>
+            <option value="7">7 月</option><option value="8">8 月</option><option value="9">9 月</option>
+            <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="field"><label>備註</label><textarea id="mo-note"></textarea></div>
+  <div class="mactions">
+    <button class="btn" onclick="closeModal('modal-order')">取消</button>
+    <button class="btn primary" style="font-size:13px;padding:9px 18px;" onclick="saveOrder()">儲存</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal: 庫存 -->
+<div class="mwrap" id="modal-inv">
+<div class="modal">
+  <h3>庫存品項</h3>
+  <div class="r2">
+    <div class="field"><label>商品名稱</label><input type="text" id="mi-name"></div>
+    <div class="field"><label>類型</label>
+      <select id="mi-type">
+        <option value="ichiban">一番賞</option><option value="blind">盲盒</option>
+        <option value="figure">Figure</option><option value="card">卡牌</option><option value="other2">其他</option>
+      </select>
+    </div>
+  </div>
+  <div class="r3">
+    <div class="field"><label>現有庫存</label><input type="number" id="mi-stock"></div>
+    <div class="field"><label>單位</label><select id="mi-unit"><option>套</option><option>盒</option><option>個</option><option>箱</option></select></div>
+    <div class="field"><label>安全庫存量</label><input type="number" id="mi-min"></div>
+  </div>
+  <div class="field" style="margin-bottom:12px;"><label>備註</label><textarea id="mi-note"></textarea></div>
+  <div class="mactions">
+    <button class="btn" onclick="closeModal('modal-inv')">取消</button>
+    <button class="btn primary" style="font-size:13px;padding:9px 18px;" onclick="saveInv()">儲存</button>
+  </div>
+</div>
+</div>
+
+<script>
+/* ── Constants ── */
+const DR={TWD:1,CNY:4.75,JPY:0.25,KRW:0.03,USD:31.48,HKD:4.03};
+const SYM={TWD:'NT$',CNY:'¥',JPY:'¥',KRW:'₩',USD:'$',HKD:'HK$'};
+const TL={ichiban:'一番賞',blind:'盲盒',figure:'Figure',card:'卡牌',other2:'其他'};
+const SL={notship:'未出貨',shipped:'已出貨',logistics:'已集運',arrived:'已到台灣',presale:'預售'};
+const SC={notship:'st-notship',shipped:'st-shipped',logistics:'st-logistics',arrived:'st-arrived',presale:'st-presale'};
+const SBTN={notship:'s-notship',shipped:'s-shipped',logistics:'s-logistics',arrived:'s-arrived'};
+const IPS={ichiban:['鬼滅の刃','海賊王','Dragon Ball','鏈鋸人','咒術迴戰'],blind:['LABUBU','Molly','Dimoo','Skullpanda','Hirono'],figure:['Dragon Ball','鋼彈','Evangelion','初音未來','Re:Zero'],card:['寶可夢','遊戲王','One Piece Card','Magic','Digimon'],other2:['迪士尼','三麗鷗','漫威','DC','Hello Kitty']};
+const CLR=['#e91e8c','#7c3aed','#0891b2','#059669','#d97706','#dc2626','#0284c7','#65a30d'];
+
+/* ── State ── */
+let orders=[],inventory=[],editId=null,selType='ichiban',curOtype='stock',curStatus='notship';
+let cfgOpen={sheets:false,rates:false,apikey:false};
+
+/* ── Storage ── */
+function LS(k,d){try{return JSON.parse(localStorage.getItem(k)||d);}catch(e){return JSON.parse(d);}}
+function SS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function uid(){return Date.now()+Math.random().toString(36).slice(2);}
+function GR(){return LS('toy_rates','null')||{...DR};}
+
+orders=LS('toy_orders','[]');
+inventory=LS('toy_inv','[]');
+
+/* ── Year selects ── */
+function fillYears(id){
+  const now=new Date().getFullYear(),el=document.getElementById(id);
+  if(!el)return;el.innerHTML='';
+  for(let y=now;y<=now+4;y++){const o=document.createElement('option');o.value=y;o.textContent=y+'年';el.appendChild(o);}
+}
+fillYears('f-presale-year');fillYears('mo-presale-year');
+
+/* ── Tabs ── */
+function gotoTab(t){
+  const tabs=['quick','orders','inventory','stats','settings'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',tabs[i]===t));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+t).classList.add('active');
+  if(t==='orders'){renderOrders();updateStats();}
+  if(t==='quick'){renderList();}
+  if(t==='inventory')renderInv();
+  if(t==='stats')renderStats();
+  if(t==='settings'){initRF();initApiKeyField();const u=getUrl();if(u)document.getElementById('sheet-url').value=u;updateConn(u);}
+}
+
+/* ── Type selector ── */
+function selectType(btn){
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');selType=btn.dataset.type;
+}
+
+/* ── Status selector (quick form) ── */
+function selectStatus(btn){
+  curStatus=btn.dataset.st;
+  refreshStatusBtns();
+}
+function refreshStatusBtns(){
+  document.querySelectorAll('.sbtn').forEach(b=>{
+    const t=b.dataset.st;
+    // reset to base class only
+    b.className=`sbtn s-${t}`;
+    if(t===curStatus) b.classList.add('sel-s');
+  });
+}
+/* ── Otype ── */
+function setOtype(t){
+  curOtype=t;
+  document.getElementById('otype-stock').className='otype-btn'+(t==='stock'?' sel-stock':'');
+  document.getElementById('otype-custom').className='otype-btn'+(t==='custom'?' sel-custom':'');
+  document.getElementById('custbox').classList.toggle('open',t==='custom');
+}
+function toggleMOcust(){
+  const t=document.getElementById('mo-otype').value;
+  document.getElementById('mo-custbox').classList.toggle('open',t==='custom');
+}
+
+/* ── Presale ── */
+function togglePresale(){
+  const on=document.getElementById('f-presale').checked;
+  document.getElementById('presale-detail').classList.toggle('open',on);
+  if(on){curStatus='notship';refreshStatusBtns();}
+}
+function toggleModalPresale(){
+  const on=document.getElementById('mo-presale').checked;
+  document.getElementById('mo-presale-detail').classList.toggle('open',on);
+  if(on)document.getElementById('mo-status').value='presale';
+}
+function refreshStatusBtns(){
+  document.querySelectorAll('.sbtn').forEach(b=>{
+    const t=b.dataset.st;
+    b.className='sbtn'+(t===curStatus?' sel-s':'');
+    if(SBTN[t])b.classList.add(SBTN[t]);
+  });
+}
+
+/* ── FX Calc ── */
+function calcFx(){
+  const raw=parseFloat(document.getElementById('f-price-raw').value)||0;
+  const cur=document.getElementById('f-currency').value;
+  const qty=parseFloat(document.getElementById('f-qty').value)||0;
+  const r=GR(),twdU=raw*(r[cur]||1);
+  document.getElementById('fx-result').textContent=raw>0?'NT$'+Math.round(twdU).toLocaleString():'—';
+  const pv=document.getElementById('preview');
+  if(qty>0&&raw>0){
+    pv.style.display='flex';
+    const total=Math.round(twdU*qty);
+    const depRaw=document.getElementById('f-deposit').value;
+    const dep=depRaw===''?total:parseFloat(depRaw)||0;
+    document.getElementById('prev-total').textContent='NT$'+total.toLocaleString();
+    document.getElementById('prev-dep').textContent='NT$'+dep.toLocaleString();
+    const bal=total-dep;
+    document.getElementById('prev-balance').textContent=bal<=0?'✓ 已付清':'NT$'+bal.toLocaleString();
+  }else{pv.style.display='none';}
+}
+function modalCalc(){
+  const raw=parseFloat(document.getElementById('mo-price-raw').value)||0;
+  const cur=document.getElementById('mo-cur').value,r=GR();
+  const qty=parseFloat(document.getElementById('mo-qty').value)||0;
+  const twdU=raw*(r[cur]||1);
+  document.getElementById('mo-fx').textContent=raw>0?'NT$'+Math.round(twdU).toLocaleString():'—';
+}
+
+/* ── Add order (quick form) ── */
+function addOrder(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){document.getElementById('f-name').focus();showFlash('請填寫商品名稱！','err');return;}
+  const raw=parseFloat(document.getElementById('f-price-raw').value)||0;
+  const cur=document.getElementById('f-currency').value,r=GR();
+  const qty=parseFloat(document.getElementById('f-qty').value)||0;
+  const priceTWD=Math.round(raw*(r[cur]||1));
+  const total=priceTWD*qty;
+  const depRaw=document.getElementById('f-deposit').value;
+  const dep=depRaw===''?total:parseFloat(depRaw)||0; // default = full payment
+  const ip=document.getElementById('f-presale').checked;
+  const st=ip?'presale':curStatus;
+  const o={
+    id:uid(),date:new Date().toISOString().slice(0,10),
+    type:selType,name,sup:document.getElementById('f-sup').value,
+    qty,unit:document.getElementById('f-unit').value,
+    price:priceTWD,priceRaw:raw,currency:cur,
+    deposit:dep,depositNote:'',
+    status:st,note:'',
+    orderType:curOtype,
+    customer:curOtype==='custom'?document.getElementById('f-customer').value.trim():'',
+    contact:curOtype==='custom'?document.getElementById('f-contact').value.trim():'',
+    presale:ip,
+    presaleYear:ip?parseInt(document.getElementById('f-presale-year').value):null,
+    presaleMonth:ip?parseInt(document.getElementById('f-presale-month').value):null,
+  };
+  orders.unshift(o);SS('toy_orders',orders);
+  const custStr=o.orderType==='custom'&&o.customer?` ／ 👤 ${o.customer}`:'';
+  const fxStr=cur!=='TWD'&&raw?` (${SYM[cur]}${raw.toLocaleString()}→NT$${priceTWD.toLocaleString()})`:'';
+  showFlash(`✅ 「${name}」已新增！${fxStr}${custStr}`,'ok');
+  resetForm();renderList();
+  if(getUrl())syncSheets(true);
+}
+
+function resetForm(){
+  ['f-name','f-sup','f-price-raw','f-qty','f-deposit','f-customer','f-contact'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-currency').value='TWD';
+  document.getElementById('f-unit').value='套';
+  document.getElementById('fx-result').textContent='—';
+  document.getElementById('preview').style.display='none';
+  document.getElementById('f-presale').checked=false;
+  document.getElementById('presale-detail').classList.remove('open');
+  curStatus='notship';refreshStatusBtns();
+  setOtype('stock');
+  selType='ichiban';
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('sel',b.dataset.type==='ichiban'));
+}
+
+/* ── Render quick list ── */
+function renderList(){
+  const c=document.getElementById('order-list');
+  document.getElementById('list-count').textContent=`共 ${orders.length} 筆`;
+  if(!orders.length){c.innerHTML='<div style="text-align:center;padding:2rem;color:var(--muted);font-size:13px;">尚無叫貨紀錄，填單後會顯示在這裡</div>';return;}
+  c.innerHTML=orders.slice(0,15).map(o=>{
+    const total=Math.round((o.qty||0)*(o.price||0));
+    const dep=o.deposit??total;
+    const bal=total-dep;
+    const isCustom=o.orderType==='custom';
+    const ps=o.presale&&o.presaleYear?`📅 ${o.presaleYear}/${o.presaleMonth}月發貨`:'';
+    return`<div class="ocard">
+      <div>
+        <div class="oname">${o.name}</div>
+        <div class="ometa">
+          ${TL[o.type]||o.type}${o.sup?' · '+o.sup:''} · ${o.date}<br>
+          ${isCustom?`<span class="ctag">👤 ${o.customer||'客訂'}${o.contact?' · '+o.contact:''}</span>`:`<span class="stktag">🏪 現貨</span>`}
+          ${ps?` <span class="pstag">${ps}</span>`:''}
+          ${dep<total?` <span class="uatag">尾款 NT$${bal.toLocaleString()}</span>`:''}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:14px;font-weight:700;">NT$${total.toLocaleString()}</div>
+        ${o.currency&&o.currency!=='TWD'&&o.priceRaw?`<div style="font-size:11px;color:var(--muted);">${SYM[o.currency]||''}${Number(o.priceRaw).toLocaleString()} ${o.currency}</div>`:''}
+        <span class="badge ${SC[o.status]||''}" style="margin-top:4px;">${SL[o.status]||o.status}</span>
+        <div><button onclick="deleteOrder('${o.id}')" style="font-size:11px;color:var(--muted);border:none;background:none;cursor:pointer;margin-top:4px;padding:0;font-family:inherit;">刪除</button></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Orders table ── */
+function renderOrders(){
+  const q=document.getElementById('q-order').value.toLowerCase();
+  const ft=document.getElementById('f-type').value;
+  const fs=document.getElementById('f-status').value;
+  const fo=document.getElementById('f-otype').value;
+  let data=orders.filter(o=>
+    (!q||(o.name||'').toLowerCase().includes(q)||(o.sup||'').toLowerCase().includes(q)||(o.customer||'').toLowerCase().includes(q))
+    &&(!ft||o.type===ft)&&(!fs||o.status===fs)
+    &&(!fo||(fo==='stock'?(o.orderType||'stock')==='stock':o.orderType===fo))
+  ).sort((a,b)=>b.date.localeCompare(a.date));
+  const tb=document.getElementById('order-body');
+  if(!data.length){tb.innerHTML='<tr><td colspan="12" class="empty">尚無叫貨紀錄</td></tr>';return;}
+  tb.innerHTML=data.map(o=>{
+    const total=Math.round((o.qty||0)*(o.price||0));
+    const dep=o.deposit??total;
+    const bal=total-dep;
+    const ps=o.presale&&o.presaleYear?`${o.presaleYear}/${o.presaleMonth}月`:'';
+    const isCustom=o.orderType==='custom';
+    return`<tr>
+      <td style="font-size:12px;color:var(--muted);">${o.date}</td>
+      <td><strong>${o.name}</strong></td>
+      <td><span class="badge ${o.type}">${TL[o.type]||o.type}</span></td>
+      <td style="font-size:12px;">${o.sup||'—'}</td>
+      <td>${o.qty} ${o.unit}</td>
+      <td>${o.currency&&o.currency!=='TWD'&&o.priceRaw?`<div style="font-size:11px;color:var(--muted);">${SYM[o.currency]||''}${(o.priceRaw||0).toLocaleString()} ${o.currency}</div>`:''}<strong>NT$${total.toLocaleString()}</strong></td>
+      <td><span class="dtag">NT$${dep.toLocaleString()}</span></td>
+      <td>${bal<=0?'<span style="color:#059669;font-weight:700;">✓ 付清</span>':`<span class="uatag">NT$${bal.toLocaleString()}</span>`}</td>
+      <td><span class="badge ${SC[o.status]||''}">${SL[o.status]||o.status}</span></td>
+      <td>${isCustom?`<span class="ctag">👤 客訂</span><div style="font-size:12px;font-weight:700;margin-top:2px;">${o.customer||''}</div>${o.contact?`<div style="font-size:11px;color:var(--muted);">${o.contact}</div>`:''}`:`<span class="stktag">🏪 現貨</span>`}</td>
+      <td style="font-size:12px;">${ps?`<span class="pstag">📅 ${ps}發貨</span>`:'—'}${o.note?`<div style="color:var(--muted);margin-top:2px;">${o.note}</div>`:''}</td>
+      <td style="white-space:nowrap;"><button class="btn sm" onclick="editOrder('${o.id}')">編輯</button> <button class="btn sm danger" onclick="deleteOrder('${o.id}')">刪除</button></td>
+    </tr>`;
+  }).join('');
+}
+function updateStats(){
+  const now=new Date(),ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const m=orders.filter(o=>o.date.startsWith(ym));
+  document.getElementById('s1').textContent=m.length;
+  document.getElementById('s2').textContent=m.filter(o=>o.status!=='arrived').length;
+  document.getElementById('s3').textContent=m.filter(o=>o.status==='arrived').length;
+  document.getElementById('s4').textContent=m.reduce((s,o)=>s+Math.round((o.qty||0)*(o.price||0)),0).toLocaleString();
+}
+function deleteOrder(id){if(!confirm('確定刪除？'))return;orders=orders.filter(o=>o.id!==id);SS('toy_orders',orders);renderOrders();renderList();updateStats();}
+
+/* ── Order Modal ── */
+function openOrderModal(id=null){
+  editId=id;
+  document.getElementById('modal-ttl').textContent=id?'編輯叫貨單':'新增叫貨單';
+  if(id){
+    const o=orders.find(x=>x.id===id);
+    document.getElementById('mo-date').value=o.date;
+    document.getElementById('mo-type').value=o.type;
+    document.getElementById('mo-name').value=o.name;
+    document.getElementById('mo-sup').value=o.sup||'';
+    document.getElementById('mo-price-raw').value=o.priceRaw||o.price;
+    document.getElementById('mo-cur').value=o.currency||'TWD';
+    document.getElementById('mo-qty').value=o.qty;
+    document.getElementById('mo-unit').value=o.unit;
+    const total=Math.round((o.qty||0)*(o.price||0));
+    const dep=o.deposit??total;
+    document.getElementById('mo-deposit').value=dep===total?'':dep;
+    document.getElementById('mo-status').value=o.status;
+    document.getElementById('mo-note').value=o.note||'';
+    document.getElementById('mo-otype').value=o.orderType||'stock';
+    document.getElementById('mo-customer').value=o.customer||'';
+    document.getElementById('mo-contact').value=o.contact||'';
+    document.getElementById('mo-custbox').classList.toggle('open',(o.orderType||'stock')==='custom');
+    const ip=!!o.presale;
+    document.getElementById('mo-presale').checked=ip;
+    document.getElementById('mo-presale-detail').classList.toggle('open',ip);
+    if(ip){document.getElementById('mo-presale-year').value=o.presaleYear||new Date().getFullYear();document.getElementById('mo-presale-month').value=o.presaleMonth||1;}
+    modalCalc();
+  }else{
+    document.getElementById('mo-date').value=new Date().toISOString().slice(0,10);
+    ['mo-name','mo-sup','mo-price-raw','mo-qty','mo-deposit','mo-note','mo-customer','mo-contact'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mo-type').value='ichiban';
+    document.getElementById('mo-cur').value='TWD';
+    document.getElementById('mo-status').value='notship';
+    document.getElementById('mo-fx').textContent='—';
+    document.getElementById('mo-otype').value='stock';
+    document.getElementById('mo-custbox').classList.remove('open');
+    document.getElementById('mo-presale').checked=false;
+    document.getElementById('mo-presale-detail').classList.remove('open');
+  }
+  openModal('modal-order');
+}
+function editOrder(id){openOrderModal(id);}
+function saveOrder(){
+  const name=document.getElementById('mo-name').value.trim();
+  if(!name){document.getElementById('mo-name').focus();return;}
+  const raw=parseFloat(document.getElementById('mo-price-raw').value)||0;
+  const cur=document.getElementById('mo-cur').value,r=GR();
+  const qty=parseFloat(document.getElementById('mo-qty').value)||0;
+  const priceTWD=Math.round(raw*(r[cur]||1));
+  const total=priceTWD*qty;
+  const depRaw=document.getElementById('mo-deposit').value;
+  const dep=depRaw===''?total:parseFloat(depRaw)||0;
+  const ip=document.getElementById('mo-presale').checked;
+  const ot=document.getElementById('mo-otype').value;
+  const o={
+    id:editId||uid(),date:document.getElementById('mo-date').value,
+    type:document.getElementById('mo-type').value,name,
+    sup:document.getElementById('mo-sup').value,
+    qty,unit:document.getElementById('mo-unit').value,
+    price:priceTWD,priceRaw:raw,currency:cur,
+    deposit:dep,depositNote:'',
+    status:document.getElementById('mo-status').value,
+    note:document.getElementById('mo-note').value,
+    orderType:ot,
+    customer:ot==='custom'?document.getElementById('mo-customer').value.trim():'',
+    contact:ot==='custom'?document.getElementById('mo-contact').value.trim():'',
+    presale:ip,
+    presaleYear:ip?parseInt(document.getElementById('mo-presale-year').value):null,
+    presaleMonth:ip?parseInt(document.getElementById('mo-presale-month').value):null,
+  };
+  if(editId){const i=orders.findIndex(x=>x.id===editId);orders[i]=o;}else{orders.unshift(o);}
+  SS('toy_orders',orders);closeModal('modal-order');renderOrders();renderList();updateStats();
+  if(getUrl())syncSheets(true);
+}
+
+/* ── Inventory ── */
+function renderInv(){
+  const q=document.getElementById('q-inv').value.toLowerCase();
+  const ft=document.getElementById('f-inv-type').value;
+  const fs=document.getElementById('f-inv-stock').value;
+  let data=inventory.filter(i=>(!q||(i.name||'').toLowerCase().includes(q))&&(!ft||i.type===ft)&&(!fs||(fs==='low'&&i.stock<i.min)||(fs==='ok'&&i.stock>=i.min)));
+  document.getElementById('low-alert').classList.toggle('show',inventory.some(i=>i.stock<i.min));
+  const tb=document.getElementById('inv-body');
+  if(!data.length){tb.innerHTML='<tr><td colspan="8" class="empty">尚無庫存品項</td></tr>';return;}
+  tb.innerHTML=data.map(i=>{const low=i.stock<i.min;return`<tr>
+    <td><strong>${i.name}</strong></td>
+    <td><span class="badge ${i.type}">${TL[i.type]||i.type}</span></td>
+    <td class="${low?'lowtag':''}">${i.stock}</td><td>${i.unit}</td><td>${i.min}</td>
+    <td><span class="badge ${low?'st-presale':'st-arrived'}">${low?'⚠ 不足':'正常'}</span></td>
+    <td style="font-size:12px;color:var(--muted);">${i.note||''}</td>
+    <td style="white-space:nowrap;"><button class="btn sm" onclick="editInv('${i.id}')">編輯</button> <button class="btn sm danger" onclick="deleteInv('${i.id}')">刪除</button></td>
+  </tr>`;}).join('');
+}
+function openInvModal(id=null){
+  editId=id;
+  if(id){const i=inventory.find(x=>x.id===id);document.getElementById('mi-name').value=i.name;document.getElementById('mi-type').value=i.type;document.getElementById('mi-stock').value=i.stock;document.getElementById('mi-unit').value=i.unit;document.getElementById('mi-min').value=i.min;document.getElementById('mi-note').value=i.note||'';}
+  else{['mi-name','mi-stock','mi-min','mi-note'].forEach(id=>document.getElementById(id).value='');editId=null;}
+  openModal('modal-inv');
+}
+function editInv(id){openInvModal(id);}
+function deleteInv(id){if(!confirm('確定刪除？'))return;inventory=inventory.filter(x=>x.id!==id);SS('toy_inv',inventory);renderInv();}
+function saveInv(){
+  const name=document.getElementById('mi-name').value.trim();if(!name){alert('請填寫商品名稱');return;}
+  const i={id:editId||uid(),name,type:document.getElementById('mi-type').value,stock:parseFloat(document.getElementById('mi-stock').value)||0,unit:document.getElementById('mi-unit').value,min:parseFloat(document.getElementById('mi-min').value)||0,note:document.getElementById('mi-note').value};
+  if(editId){const idx=inventory.findIndex(x=>x.id===editId);inventory[idx]=i;}else{inventory.push(i);}
+  SS('toy_inv',inventory);closeModal('modal-inv');renderInv();
+}
+
+/* ── Stats ── */
+function renderStats(){
+  const total=orders.reduce((s,o)=>s+Math.round((o.qty||0)*(o.price||0)),0);
+  document.getElementById('r1').textContent=total.toLocaleString();
+  document.getElementById('r2').textContent=orders.filter(o=>o.orderType==='custom').length;
+  const ic={};orders.forEach(o=>{ic[o.name]=(ic[o.name]||0)+1;});
+  const top=Object.entries(ic).sort((a,b)=>b[1]-a[1])[0];
+  document.getElementById('r3').textContent=top?top[0]:'—';
+  document.getElementById('r4').textContent=orders.filter(o=>o.presale&&o.status!=='arrived').length;
+  rBar('chart-type',Object.entries(orders.reduce((m,o)=>{const k=TL[o.type]||o.type;m[k]=(m[k]||0)+Math.round((o.qty||0)*(o.price||0));return m;},{})).sort((a,b)=>b[1]-a[1]),v=>v.toLocaleString());
+  rBar('chart-status',Object.entries(orders.reduce((m,o)=>{const k=SL[o.status]||o.status;m[k]=(m[k]||0)+1;return m;},{})).sort((a,b)=>b[1]-a[1]),v=>v+'筆');
+  rBar('chart-sup',Object.entries(orders.reduce((m,o)=>{if(o.sup)m[o.sup]=(m[o.sup]||0)+Math.round((o.qty||0)*(o.price||0));return m;},{})).sort((a,b)=>b[1]-a[1]).slice(0,6),v=>v.toLocaleString());
+  rBar('chart-items',Object.entries(ic).sort((a,b)=>b[1]-a[1]).slice(0,8),v=>v+'次');
+}
+function rBar(id,entries,fmt){
+  const c=document.getElementById(id);
+  if(!entries.length){c.innerHTML='<div style="text-align:center;padding:1rem;color:var(--muted);font-size:13px;">尚無資料</div>';return;}
+  const mx=entries[0][1]||1;
+  c.innerHTML=entries.map((e,i)=>`<div class="brow"><div class="blbl" title="${e[0]}">${e[0]}</div><div class="btrack"><div class="bfill" style="width:${Math.round(e[1]/mx*100)}%;background:${CLR[i%CLR.length]};"></div></div><div class="bval">${fmt(e[1])}</div></div>`).join('');
+}
+
+/* ── Excel ── */
+function exportExcel(){
+  if(!orders.length){alert('沒有叫貨資料可匯出');return;}
+  const rows=orders.map(o=>{
+    const total=Math.round((o.qty||0)*(o.price||0));
+    const dep=o.deposit??total;
+    return{
+      '日期':o.date,'商品名稱':o.name,'類型':TL[o.type]||o.type,'供應商':o.sup||'',
+      '數量':o.qty,'單位':o.unit,'進價(原幣)':o.priceRaw||o.price,'幣別':o.currency||'TWD',
+      '進價(台幣)':o.price,'叫貨總額':total,'訂金':dep,'尾款':Math.max(0,total-dep),
+      '狀態':SL[o.status]||o.status,'性質':o.orderType==='custom'?'客訂':'現貨',
+      '預訂者姓名':o.customer||'','聯絡方式':o.contact||'',
+      '預售':o.presale?'是':'否','預計發貨':o.presale&&o.presaleYear?`${o.presaleYear}年${o.presaleMonth}月`:'',
+      '備註':o.note||''
+    };
+  });
+  const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'叫貨紀錄',ws);
+  if(inventory.length){XLSX.utils.book_append_sheet(wb,'庫存清單',XLSX.utils.json_to_sheet(inventory.map(i=>({'商品名稱':i.name,'類型':TL[i.type]||i.type,'庫存':i.stock,'單位':i.unit,'安全庫存':i.min,'狀態':i.stock<i.min?'庫存不足':'正常','備註':i.note||''}))));}
+  XLSX.writeFile(wb,`玩具叫貨紀錄_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+/* ── Sheets sync ── */
+function getUrl(){try{return localStorage.getItem('toy_sheet_url')||'';}catch(e){return '';}}
+function saveUrl(){const v=document.getElementById('sheet-url').value.trim();try{localStorage.setItem('toy_sheet_url',v);}catch(e){}updateConn(v);}
+function updateConn(url){
+  const v=url&&url.includes('script.google.com');
+  document.getElementById('conn-dot').className='dot'+(v?' on':'');
+  document.getElementById('hdr-dot').className='dot'+(v?' on':'');
+  document.getElementById('hdr-lbl').textContent=v?'試算表已連接':'未連接試算表';
+  const st=document.getElementById('sync-status');if(st)st.textContent=v?'URL 已設定':'請貼上 Apps Script URL';
+  const sb=document.getElementById('sync-btn');if(sb)sb.disabled=!v;
+}
+async function syncSheets(silent=false){
+  const url=getUrl();if(!url){if(!silent)showFlash('請先到設定頁面輸入 Apps Script URL','err');return;}
+  const sb=document.getElementById('sync-btn');if(sb){sb.textContent='同步中...';sb.disabled=true;}
+  try{
+    const res=await fetch(url,{method:'POST',body:JSON.stringify({action:'sync',orders:orders.map(o=>({...o,typeLabel:TL[o.type]||o.type,statusLabel:SL[o.status]||o.status}))})});
+    const data=await res.json();
+    if(data.ok){if(!silent)showFlash(`成功同步 ${data.rows} 筆至 Google 試算表！`,'ok');}
+    else{if(!silent)showFlash('同步失敗：'+data.error,'err');}
+  }catch(e){if(!silent)showFlash('無法連線，請確認 URL','err');}
+  if(sb){sb.textContent='同步至試算表';sb.disabled=false;updateConn(getUrl());}
+}
+
+/* ── Rates ── */
+function initRF(){
+  const r=GR();
+  document.getElementById('r-cny').value=r.CNY;document.getElementById('r-jpy').value=r.JPY;
+  document.getElementById('r-krw').value=r.KRW;document.getElementById('r-usd').value=r.USD;
+  document.getElementById('r-hkd').value=r.HKD;
+  document.getElementById('rate-note').textContent=`固定匯率 · CNY=${r.CNY} · JPY=${r.JPY} · KRW=${r.KRW} · USD=${r.USD} · HKD=${r.HKD}`;
+}
+function saveRates(){
+  const r={TWD:1,CNY:parseFloat(document.getElementById('r-cny').value)||DR.CNY,JPY:parseFloat(document.getElementById('r-jpy').value)||DR.JPY,KRW:parseFloat(document.getElementById('r-krw').value)||DR.KRW,USD:parseFloat(document.getElementById('r-usd').value)||DR.USD,HKD:parseFloat(document.getElementById('r-hkd').value)||DR.HKD};
+  SS('toy_rates',r);
+  document.getElementById('rate-note').textContent=`固定匯率 · CNY=${r.CNY} · JPY=${r.JPY} · KRW=${r.KRW} · USD=${r.USD} · HKD=${r.HKD}`;
+}
+function clearData(){if(!confirm('確定清除所有資料？此動作無法復原！'))return;orders=[];inventory=[];SS('toy_orders',[]);SS('toy_inv',[]);renderOrders();renderList();renderInv();alert('已清除');}
+
+/* ── Modal helpers ── */
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');editId=null;}
+document.querySelectorAll('.mwrap').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open');}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.mwrap.open').forEach(m=>m.classList.remove('open'));});
+
+function toggleCfg(k){
+  cfgOpen[k]=!cfgOpen[k];
+  document.getElementById('cfg-'+k).style.display=cfgOpen[k]?'block':'none';
+  document.getElementById('cfg-'+k+'-t').textContent=cfgOpen[k]?'▲ 收起':'▼ 展開';
+}
+function showFlash(msg,type='ok'){
+  const f=document.getElementById('flash');if(!f)return;
+  f.textContent=msg;f.className=`alert ${type} show`;
+  setTimeout(()=>f.classList.remove('show'),4000);
+}
+
+/* ── API Key ── */
+function getApiKey(){try{return localStorage.getItem('toy_apikey')||'';}catch(e){return '';}}
+function saveApiKey(){
+  const v=document.getElementById('apikey-input').value.trim();
+  try{localStorage.setItem('toy_apikey',v);}catch(e){}
+  const st=document.getElementById('apikey-status');
+  if(st) st.innerHTML=v
+    ?'<span style="color:#059669;">✅ Gemini API Key 已儲存</span>'
+    :'';
+  updateAiWarn();
+}
+function toggleApiKeyVis(){
+  const inp=document.getElementById('apikey-input');
+  inp.type=inp.type==='password'?'text':'password';
+}
+function updateAiWarn(){
+  const warn=document.getElementById('ai-nokey-warn');
+  if(warn) warn.style.display=getApiKey()?'none':'block';
+}
+function initApiKeyField(){
+  const k=getApiKey();
+  const inp=document.getElementById('apikey-input');
+  if(inp&&k) inp.value=k;
+  updateAiWarn();
+}
+
+/* ── AI Image Recognition ── */
+let aiData=null;
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('ai-drop').classList.remove('drag');
+  const file=e.dataTransfer.files[0];
+  if(file&&file.type.startsWith('image/'))processImage(file);
+}
+function handleFile(e){
+  const file=e.target.files[0];
+  if(file)processImage(file);
+}
+function processImage(file){
+  const key=getApiKey();
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const b64=ev.target.result.split(',')[1];
+    document.getElementById('ai-preview-img').src=ev.target.result;
+    document.getElementById('ai-preview-wrap').style.display='block';
+    document.getElementById('ai-result-box').style.display='none';
+    if(key){
+      runAI(b64, file.type, key);
+    } else {
+      showFlash('請先到 ⚙️ 設定 填入免費 Gemini API Key','err');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runAI(base64, mimeType, apiKey){
+  const statusEl=document.getElementById('ai-status');
+  statusEl.style.display='flex';
+  statusEl.innerHTML='<span class="ai-spinning">⚙️</span>&nbsp;<span style="font-size:13px;color:var(--muted);">AI 辨識中，請稍候…</span>';
+
+  const prompt=`你是玩具店叫貨助理，請分析這張訂單截圖，只回覆一個 JSON，不要任何其他文字或 markdown：
+{"name":"商品完整名稱","supplier":"供應商（無則空字串）","qty":數量數字,"unit":"套或盒或個或箱或包或端","price":金額數字,"currency":"TWD或CNY或JPY或KRW或USD或HKD","type":"ichiban或blind或figure或card或other2","notes":"備注（無則空字串）"}`;
+
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  try{
+    const resp=await fetch(url,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        contents:[{
+          parts:[
+            {inline_data:{mime_type:mimeType,data:base64}},
+            {text:prompt}
+          ]
+        }],
+        generationConfig:{temperature:0,maxOutputTokens:400}
+      })
+    });
+
+    // Read raw text first for diagnosis
+    const rawText=await resp.text();
+
+    if(!resp.ok){
+      // Try to parse error details
+      let errMsg=`HTTP ${resp.status}`;
+      try{
+        const errJson=JSON.parse(rawText);
+        const detail=errJson?.error?.message||errJson?.error?.status||'';
+        if(detail) errMsg+=`：${detail}`;
+        else errMsg+=`：${rawText.slice(0,150)}`;
+      }catch{
+        errMsg+=`：${rawText.slice(0,150)}`;
+      }
+      throw new Error(errMsg);
+    }
+
+    let data;
+    try{ data=JSON.parse(rawText); }
+    catch{ throw new Error('無法解析 API 回應：'+rawText.slice(0,150)); }
+
+    // Gemini response
+    const text=data?.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    if(!text){
+      const reason=data?.candidates?.[0]?.finishReason||'';
+      const detail=reason?`(${reason})`:'';
+      // show full response for diagnosis
+      throw new Error(`回傳內容為空 ${detail}｜完整回應：${JSON.stringify(data).slice(0,200)}`);
+    }
+
+    const clean=text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
+    const s=clean.indexOf('{'), e2=clean.lastIndexOf('}');
+    if(s===-1||e2===-1) throw new Error('找不到 JSON，AI 原始回覆：「'+clean.slice(0,150)+'」');
+    aiData=JSON.parse(clean.slice(s,e2+1));
+    showAiResult(aiData);
+    statusEl.style.display='none';
+
+  }catch(err){
+    console.error('Gemini error:',err);
+    // Show full error message (no truncation) so user can see exactly what's wrong
+    statusEl.innerHTML=`
+      <div style="font-size:12px;color:#dc2626;line-height:1.6;">
+        ⚠️ 辨識失敗<br>
+        <span style="font-size:11px;word-break:break-all;">${err.message}</span>
+      </div>`;
+  }
+}
+
+function showAiResult(d){
+  const TN={ichiban:'一番賞',blind:'盲盒',figure:'Figure',card:'卡牌',other2:'其他'};
+  const SYM2={TWD:'NT$',CNY:'¥',JPY:'¥',KRW:'₩',USD:'$',HKD:'HK$'};
+  const priceStr=d.price?(SYM2[d.currency]||'')+Number(d.price).toLocaleString()+(d.currency&&d.currency!=='TWD'?' '+d.currency:''):'—';
+  document.getElementById('ai-result-content').innerHTML=`
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;">
+      <span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">商品名稱</span><span style="font-weight:700;">${d.name||'—'}</span>
+      <span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">供應商</span><span>${d.supplier||'—'}</span>
+      <span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">數量</span><span>${d.qty||0} ${d.unit||''}</span>
+      <span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">進價</span><span style="color:var(--pink);font-weight:700;">${priceStr}</span>
+      <span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">類型</span><span>${TN[d.type]||d.type||'—'}</span>
+      ${d.notes?`<span style="color:var(--muted);font-size:11px;font-weight:700;padding-top:2px;">備注</span><span>${d.notes}</span>`:''}
+    </div>`;
+  document.getElementById('ai-result-box').style.display='block';
+}
+
+function applyAiResult(){
+  if(!aiData) return;
+  const r=GR();
+  if(aiData.name)  document.getElementById('f-name').value=aiData.name;
+  if(aiData.supplier) document.getElementById('f-sup').value=aiData.supplier;
+  if(aiData.qty)   document.getElementById('f-qty').value=aiData.qty;
+  if(aiData.unit){
+    const sel=document.getElementById('f-unit');
+    if(['套','盒','個','箱','包','端'].includes(aiData.unit)) sel.value=aiData.unit;
+  }
+  if(aiData.price){
+    document.getElementById('f-price-raw').value=aiData.price;
+    if(aiData.currency) document.getElementById('f-currency').value=aiData.currency;
+  }
+  if(aiData.type){
+    selType=aiData.type;
+    document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('sel',b.dataset.type===aiData.type));
+  }
+  calcFx();
+  showFlash('✅ AI 辨識結果已套用，請確認並補齊資訊','ok');
+  document.getElementById('f-name').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function clearAi(){
+  aiData=null;
+  document.getElementById('ai-preview-wrap').style.display='none';
+  document.getElementById('ai-result-box').style.display='none';
+  document.getElementById('ai-status').style.display='none';
+  document.getElementById('ai-file').value='';
+}
+
+/* ── Init ── */
+
+function showAiResult(d){
+  const TN={ichiban:'一番賞',blind:'盲盒',figure:'Figure',card:'卡牌',other2:'其他'};
+  const box=document.getElementById('ai-result-box');
+  const content=document.getElementById('ai-result-content');
+  const rows=[
+    ['商品名稱',d.name,'ai-r-name'],
+    ['供應商',d.supplier,'ai-r-sup'],
+    ['數量',d.qty+(d.unit?' '+d.unit:''),'ai-r-qty'],
+    ['進價',d.currency&&d.currency!=='TWD'?`${d.price} ${d.currency}`:`NT$${d.price}`,'ai-r-price'],
+    ['類型',TN[d.type]||d.type||'其他','ai-r-type'],
+    ['備注',d.notes||'—','ai-r-notes'],
+  ];
+  content.innerHTML=rows.map(([lbl,val])=>`
+    <div class="ai-field-row">
+      <span class="ai-field-lbl">${lbl}</span>
+      <span class="ai-field-val">${val||'—'}</span>
+    </div>`).join('');
+  box.style.display='block';
+}
+
+function applyAiResult(){
+  if(!aiData)return;
+  const DR2=GR();
+  // name
+  if(aiData.name)document.getElementById('f-name').value=aiData.name;
+  // supplier
+  if(aiData.supplier)document.getElementById('f-sup').value=aiData.supplier;
+  // qty
+  if(aiData.qty)document.getElementById('f-qty').value=aiData.qty;
+  // unit
+  if(aiData.unit){
+    const sel=document.getElementById('f-unit');
+    const opts=['套','盒','個','箱','包','端'];
+    if(opts.includes(aiData.unit))sel.value=aiData.unit;
+  }
+  // price & currency
+  if(aiData.price){
+    document.getElementById('f-price-raw').value=aiData.price;
+    if(aiData.currency)document.getElementById('f-currency').value=aiData.currency;
+  }
+  // type
+  if(aiData.type){
+    selType=aiData.type;
+    document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('sel',b.dataset.type===aiData.type));
+  }
+  calcFx();
+  showFlash('✅ AI 辨識結果已套用，請確認並補齊缺少的資訊','ok');
+  // scroll to form
+  document.getElementById('f-name').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function clearAi(){
+  aiData=null;
+  document.getElementById('ai-preview-wrap').style.display='none';
+  document.getElementById('ai-result-box').style.display='none';
+  document.getElementById('ai-status').style.display='none';
+  document.getElementById('ai-file').value='';
+}
+
+/* ── Init ── */
+updateConn(getUrl());
+renderOrders();updateStats();renderList();renderInv();initRF();initApiKeyField();
+refreshStatusBtns();
+</script>
+</body>
+</html>
